@@ -84,15 +84,20 @@ func (p Pbkdf2Settings) Hash(pass []byte) *Pbkdf2Hash {
 	}
 }
 
+func (p Pbkdf2Settings) String() string {
+	return fmt.Sprintf("%s$%d$%s",
+		p.Hasher,
+		p.IterationCount,
+		base64.StdEncoding.EncodeToString(p.Salt))
+}
+
 func (p *Pbkdf2Hash) Verify(pass []byte) bool {
 	hashedPass := p.Settings.Hash(pass)
 	return subtle.ConstantTimeCompare(p.Hash, hashedPass.Hash) == 1
 }
 
 func (p *Pbkdf2Hash) String() string {
-	return fmt.Sprintf("%s$%d$%s$%s",
-		p.Settings.Hasher,
-		p.Settings.IterationCount,
-		base64.StdEncoding.EncodeToString(p.Settings.Salt),
+	return fmt.Sprintf("%s$%s",
+		p.Settings,
 		base64.StdEncoding.EncodeToString(p.Hash))
 }
