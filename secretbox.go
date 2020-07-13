@@ -3,8 +3,6 @@ package cryptoUtils
 import (
 	"errors"
 	"fmt"
-	"strconv"
-	"strings"
 
 	"golang.org/x/crypto/nacl/secretbox"
 )
@@ -17,11 +15,11 @@ type Secretbox struct {
 }
 
 func SecretboxEncrypt(pass, payload string) (*Secretbox, error) {
-	passSalt, err := RandomBytes(DefaultPbdkf2Hasher.SaltLen)
+	passSalt, err := RandomBytes(DefaultPbdkf2Settings.SaltLen)
 	if err != nil {
 		return nil, err
 	}
-	hash := DefaultPbdkf2Hasher.Hash([]byte(pass), passSalt)
+	hash := DefaultPbdkf2Settings.Hash([]byte(pass), passSalt)
 
 	var nonce [24]byte
 	if err := ReadRandom(nonce[:]); err != nil {
@@ -45,30 +43,19 @@ func SecretboxEncrypt(pass, payload string) (*Secretbox, error) {
 }
 
 func ParseSecretbox(input string) (*Secretbox, error) {
-	split := strings.SplitN(input, "$", 6)
-	if len(split) != 6 {
-		return nil, fmt.Errorf("Unexpected number of parts: %d", len(split))
-	}
-
-	alg := split[0]
-	kdfAlg := split[1]
-	rawIterCount := split[2]
-	rawPassSalt := split[3]
-	rawNonce := split[4]
-	rawData := split[5]
-
+	alg, rest := SplitOne(input)
 	if alg != "secretbox" {
 		return nil, fmt.Errorf("Unknown algorithm %q", alg)
 	}
 
-	if kdfAlg != "pbkdf2_sha256" {
-		return nil, fmt.Errorf("Unknown kdf algorithm %q", kdfAlg)
-	}
-
-	iterCount, err := strconv.Atoi(rawIterCount)
+	settings, rest, err := ParsePbkdf2Settings(rest)
 	if err != nil {
 		return nil, err
 	}
+
+	rawPassSalt, rest := SplitOne(rest)
+	rawNonce, rest := SplitOne(rest)
+	rawData, rest := SplitOne(rest)
 
 	passSalt, err := Base64Decode(rawPassSalt)
 	if err != nil {
@@ -89,11 +76,7 @@ func ParseSecretbox(input string) (*Secretbox, error) {
 	}
 
 	return &Secretbox{
-		Settings: Pbkdf2Settings{
-			Hasher:         kdfAlg,
-			IterationCount: iterCount,
-			KeyLength:      32,
-		},
+		Settings: *settings,
 		PassSalt: passSalt,
 		Nonce:    nonce,
 		Data:     data,

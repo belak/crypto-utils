@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"hash"
 	"strconv"
-	"strings"
 
 	"golang.org/x/crypto/pbkdf2"
 )
@@ -24,7 +23,7 @@ var pbkdfHashers map[string]func() hash.Hash = map[string]func() hash.Hash{
 	"pbkdf2_sha512": sha512.New,
 }
 
-var DefaultPbdkf2Hasher = Pbkdf2Settings{
+var DefaultPbdkf2Settings = Pbkdf2Settings{
 	Hasher:         "pbkdf2_sha256",
 	IterationCount: 260000,
 	SaltLen:        8,
@@ -44,47 +43,50 @@ type Pbkdf2Hash struct {
 	Hash     []byte
 }
 
-func ParsePbkdf2Hash(data string) (*Pbkdf2Hash, error) {
-	hashedParts := strings.Split(data, "$")
-	if len(hashedParts) != 4 {
-		return nil, fmt.Errorf("Unexpected number of hashed parts: %d", len(hashedParts))
-	}
-
-	rawAlg := hashedParts[0]
-	rawIter := hashedParts[1]
-	rawSalt := hashedParts[2]
-	rawHash := hashedParts[3]
-
+func ParsePbkdf2Settings(data string) (*Pbkdf2Settings, string, error) {
+	rawAlg, data := SplitOne(data)
 	_, ok := pbkdfHashers[rawAlg]
 	if !ok {
-		return nil, fmt.Errorf("Unexpected algorithm %q", rawAlg)
+		return nil, "", fmt.Errorf("Unexpected algorithm %q", rawAlg)
 	}
 
+	rawIter, data := SplitOne(data)
 	iter, err := strconv.Atoi(rawIter)
 	if err != nil {
-		return nil, err
+		return nil, "", err
 	}
+
+	return &Pbkdf2Settings{
+		Hasher:         rawAlg,
+		IterationCount: iter,
+		KeyLength:      DefaultPbdkf2Settings.KeyLength,
+	}, data, nil
+}
+
+func ParsePbkdf2Hash(data string) (*Pbkdf2Hash, string, error) {
+	settings, data, err := ParsePbkdf2Settings(data)
+
+	rawSalt, data := SplitOne(data)
+	rawHash, data := SplitOne(data)
 
 	salt, err := Base64Decode(rawSalt)
 	if err != nil {
-		return nil, err
+		return nil, "", err
 	}
 
 	hash, err := Base64Decode(rawHash)
 	if err != nil {
-		return nil, err
+		return nil, "", err
 	}
 
+	settings.SaltLen = len(salt)
+	settings.KeyLength = len(hash)
+
 	return &Pbkdf2Hash{
-		Settings: Pbkdf2Settings{
-			Hasher:         rawAlg,
-			IterationCount: iter,
-			SaltLen:        len(salt),
-			KeyLength:      len(hash),
-		},
-		Salt: salt,
-		Hash: hash,
-	}, nil
+		Settings: *settings,
+		Salt:     salt,
+		Hash:     hash,
+	}, data, nil
 }
 
 func (p Pbkdf2Settings) Hash(pass []byte, salt []byte) *Pbkdf2Hash {

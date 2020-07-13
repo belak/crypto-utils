@@ -16,22 +16,27 @@ func main() {
 		Commands: []*cli.Command{
 			{
 				Flags: []cli.Flag{
+					&cli.StringFlag{
+						Name:  "hasher",
+						Value: cryptoUtils.DefaultPbdkf2Settings.Hasher,
+					},
 					&cli.IntFlag{
 						Name:  "salt-length",
-						Value: 8,
+						Value: cryptoUtils.DefaultPbdkf2Settings.SaltLen,
 					},
 					&cli.IntFlag{
 						Name:  "iteration-count",
-						Value: 260000,
+						Value: cryptoUtils.DefaultPbdkf2Settings.IterationCount,
 					},
 					&cli.IntFlag{
 						Name:  "key-length",
-						Value: 32,
+						Value: cryptoUtils.DefaultPbdkf2Settings.KeyLength,
 					},
 				},
 				Name: "derive",
 				Action: func(c *cli.Context) error {
 					for _, pass := range c.Args().Slice() {
+						hasher := c.String("hasher")
 						saltLength := c.Int("salt-length")
 						iterationCount := c.Int("iteration-count")
 						keyLength := c.Int("key-length")
@@ -46,7 +51,7 @@ func main() {
 							pass, saltLength, iterationCount, keyLength)
 
 						hashed := cryptoUtils.Pbkdf2Settings{
-							Hasher:         "pbkdf2_sha256",
+							Hasher:         hasher,
 							IterationCount: iterationCount,
 							SaltLen:        saltLength,
 							KeyLength:      keyLength,
@@ -67,7 +72,7 @@ func main() {
 						pass := c.Args().Get(i - 1)
 						rawHashed := c.Args().Get(i)
 
-						hashed, err := cryptoUtils.ParsePbkdf2Hash(rawHashed)
+						hashed, _, err := cryptoUtils.ParsePbkdf2Hash(rawHashed)
 						if err != nil {
 							return err
 						}
