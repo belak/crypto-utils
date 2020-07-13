@@ -56,10 +56,16 @@ func ParsePbkdf2Settings(data string) (*Pbkdf2Settings, string, error) {
 		return nil, "", err
 	}
 
+	rawKeyLen, data := SplitOne(data)
+	keyLen, err := strconv.Atoi(rawKeyLen)
+	if err != nil {
+		return nil, "", err
+	}
+
 	return &Pbkdf2Settings{
 		Hasher:         rawAlg,
 		IterationCount: iter,
-		KeyLength:      DefaultPbdkf2Settings.KeyLength,
+		KeyLength:      keyLen,
 	}, data, nil
 }
 
@@ -100,9 +106,10 @@ func (p Pbkdf2Settings) Hash(pass []byte, salt []byte) *Pbkdf2Hash {
 }
 
 func (p Pbkdf2Settings) String() string {
-	return fmt.Sprintf("%s$%d",
+	return fmt.Sprintf("%s$%d$%d",
 		p.Hasher,
-		p.IterationCount)
+		p.IterationCount,
+		p.KeyLength)
 }
 
 func (p *Pbkdf2Hash) Verify(pass []byte) bool {
