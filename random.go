@@ -1,4 +1,4 @@
-package cryptoUtil
+package cryptoUtils
 
 import "crypto/rand"
 
@@ -9,4 +9,9 @@ func RandomSalt(saltLength int) ([]byte, error) {
 		return nil, err
 	}
 	return salt, nil
+}
+
+func ReadRandom(data []byte) error {
+	_, err := rand.Read(data)
+	return err
 }

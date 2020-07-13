@@ -1,10 +1,9 @@
-package cryptoUtil
+package cryptoUtils
 
 import (
 	"crypto/sha1"
 	"crypto/sha256"
 	"crypto/subtle"
-	"encoding/base64"
 	"fmt"
 	"hash"
 	"strconv"
@@ -14,6 +13,10 @@ import (
 	"golang.org/x/crypto/sha3"
 )
 
+// These are roughly based off the django password hashers, though there only
+// sha1 (officially from the pbkdf2 RFC) and sha256 are supported. sha384 and
+// sha512 have been added as they're called out as working by the Go
+// documentation.
 var pbkdfHashers map[string]func() hash.Hash = map[string]func() hash.Hash{
 	"pbkdf2_sha1":   sha1.New,
 	"pbkdf2_sha256": sha256.New,
@@ -21,15 +24,23 @@ var pbkdfHashers map[string]func() hash.Hash = map[string]func() hash.Hash{
 	"pbkdf2_sha512": sha3.New512,
 }
 
+var DefaultPbdkf2Hasher = Pbkdf2Settings{
+	Hasher:         "pbkdf2_sha256",
+	IterationCount: 260000,
+	SaltLen:        8,
+	KeyLength:      32,
+}
+
 type Pbkdf2Settings struct {
 	Hasher         string
 	IterationCount int
-	Salt           []byte
+	SaltLen        int
 	KeyLength      int
 }
 
 type Pbkdf2Hash struct {
 	Settings Pbkdf2Settings
+	Salt     []byte
 	Hash     []byte
 }
 
@@ -54,12 +65,12 @@ func ParsePbkdf2Hash(data string) (*Pbkdf2Hash, error) {
 		return nil, err
 	}
 
-	salt, err := base64.StdEncoding.DecodeString(rawSalt)
+	salt, err := Base64Decode(rawSalt)
 	if err != nil {
 		return nil, err
 	}
 
-	hash, err := base64.StdEncoding.DecodeString(rawHash)
+	hash, err := Base64Decode(rawHash)
 	if err != nil {
 		return nil, err
 	}
@@ -68,36 +79,38 @@ func ParsePbkdf2Hash(data string) (*Pbkdf2Hash, error) {
 		Settings: Pbkdf2Settings{
 			Hasher:         rawAlg,
 			IterationCount: iter,
-			Salt:           salt,
+			SaltLen:        len(salt),
 			KeyLength:      len(hash),
 		},
+		Salt: salt,
 		Hash: hash,
 	}, nil
 }
 
-func (p Pbkdf2Settings) Hash(pass []byte) *Pbkdf2Hash {
-	hash := pbkdf2.Key(pass, p.Salt, p.IterationCount, p.KeyLength, pbkdfHashers[p.Hasher])
+func (p Pbkdf2Settings) Hash(pass []byte, salt []byte) *Pbkdf2Hash {
+	hash := pbkdf2.Key(pass, salt, p.IterationCount, p.KeyLength, pbkdfHashers[p.Hasher])
 
 	return &Pbkdf2Hash{
 		Settings: p,
+		Salt:     salt,
 		Hash:     hash,
 	}
 }
 
 func (p Pbkdf2Settings) String() string {
-	return fmt.Sprintf("%s$%d$%s",
+	return fmt.Sprintf("%s$%d",
 		p.Hasher,
-		p.IterationCount,
-		base64.StdEncoding.EncodeToString(p.Salt))
+		p.IterationCount)
 }
 
 func (p *Pbkdf2Hash) Verify(pass []byte) bool {
-	hashedPass := p.Settings.Hash(pass)
+	hashedPass := p.Settings.Hash(pass, p.Salt)
 	return subtle.ConstantTimeCompare(p.Hash, hashedPass.Hash) == 1
 }
 
 func (p *Pbkdf2Hash) String() string {
-	return fmt.Sprintf("%s$%s",
+	return fmt.Sprintf("%s$%s$%s",
 		p.Settings,
-		base64.StdEncoding.EncodeToString(p.Hash))
+		Base64Encode(p.Salt),
+		Base64Encode(p.Hash))
 }
