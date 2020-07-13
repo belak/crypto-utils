@@ -3,6 +3,7 @@ package cryptoUtils
 import (
 	"crypto/sha1"
 	"crypto/sha256"
+	"crypto/sha512"
 	"crypto/subtle"
 	"fmt"
 	"hash"
@@ -10,7 +11,6 @@ import (
 	"strings"
 
 	"golang.org/x/crypto/pbkdf2"
-	"golang.org/x/crypto/sha3"
 )
 
 // These are roughly based off the django password hashers, though there only
@@ -20,8 +20,8 @@ import (
 var pbkdfHashers map[string]func() hash.Hash = map[string]func() hash.Hash{
 	"pbkdf2_sha1":   sha1.New,
 	"pbkdf2_sha256": sha256.New,
-	"pbkdf2_sha384": sha3.New384,
-	"pbkdf2_sha512": sha3.New512,
+	"pbkdf2_sha384": sha512.New384,
+	"pbkdf2_sha512": sha512.New,
 }
 
 var DefaultPbdkf2Hasher = Pbkdf2Settings{

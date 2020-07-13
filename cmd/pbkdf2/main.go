@@ -36,7 +36,7 @@ func main() {
 						iterationCount := c.Int("iteration-count")
 						keyLength := c.Int("key-length")
 
-						salt, err := cryptoUtils.RandomSalt(saltLength)
+						salt, err := cryptoUtils.RandomBytes(saltLength)
 						if err != nil {
 							return err
 						}

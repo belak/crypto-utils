@@ -17,7 +17,7 @@ type Secretbox struct {
 }
 
 func SecretboxEncrypt(pass, payload string) (*Secretbox, error) {
-	passSalt, err := RandomSalt(DefaultPbdkf2Hasher.SaltLen)
+	passSalt, err := RandomBytes(DefaultPbdkf2Hasher.SaltLen)
 	if err != nil {
 		return nil, err
 	}
