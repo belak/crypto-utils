@@ -30,8 +30,6 @@ func SecretboxEncrypt(pass, payload string) (*Secretbox, error) {
 	copy(secretKey[:], hash.Hash)
 
 	var out []byte
-	copy(out, nonce[:])
-
 	data := secretbox.Seal(out, []byte(payload), &nonce, &secretKey)
 
 	return &Secretbox{
@@ -90,8 +88,6 @@ func (s *Secretbox) Decrypt(pass string) (string, error) {
 	copy(secretKey[:], hash.Hash)
 
 	var out []byte
-	copy(out, s.Nonce[:])
-
 	data, ok := secretbox.Open(out, s.Data, &s.Nonce, &secretKey)
 	if !ok {
 		return "", errors.New("failed to decrypt")
