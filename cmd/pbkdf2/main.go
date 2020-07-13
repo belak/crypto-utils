@@ -1,18 +1,12 @@
 package main
 
 import (
-	"crypto/rand"
-	"crypto/sha256"
-	"crypto/subtle"
-	"encoding/base64"
 	"fmt"
 	"log"
 	"os"
-	"strconv"
-	"strings"
 
+	cryptoUtil "github.com/belak/crypto-utils"
 	cli "github.com/urfave/cli/v2"
-	"golang.org/x/crypto/pbkdf2"
 )
 
 // TODO: support other hashing algorithms
@@ -44,8 +38,7 @@ func main() {
 						iterationCount := c.Int("iteration-count")
 						keyLength := c.Int("key-length")
 
-						salt := make([]byte, saltLength)
-						_, err := rand.Read(salt)
+						salt, err := cryptoUtil.RandomSalt(saltLength)
 						if err != nil {
 							return err
 						}
@@ -54,16 +47,16 @@ func main() {
 							"Generating hash for %q using a salt length of %d, an iteration count of %d and a key-length of %d\n",
 							pass, saltLength, iterationCount, keyLength)
 
-						hash := pbkdf2.Key([]byte(pass), salt, iterationCount, keyLength, sha256.New)
+						hashed := cryptoUtil.Pbkdf2Settings{
+							Hasher:         "pbkdf2_sha256",
+							IterationCount: iterationCount,
+							Salt:           salt,
+							KeyLength:      keyLength,
+						}.Hash([]byte(pass))
 
-						fmt.Printf("salt: %x\n", salt)
-						fmt.Printf("hash: %x\n", hash)
-
-						fmt.Printf("out: %s$%d$%s$%s\n",
-							"pbkdf2_sha256",
-							iterationCount,
-							base64.StdEncoding.EncodeToString(salt),
-							base64.StdEncoding.EncodeToString(hash))
+						fmt.Printf("salt: %x\n", hashed.Settings.Salt)
+						fmt.Printf("hash: %x\n", hashed.Hash)
+						fmt.Printf("out: %s\n", hashed)
 					}
 
 					return nil
@@ -74,40 +67,14 @@ func main() {
 				Action: func(c *cli.Context) error {
 					for i := 1; i < c.Args().Len(); i += 2 {
 						pass := c.Args().Get(i - 1)
-						hashed := c.Args().Get(i)
+						rawHashed := c.Args().Get(i)
 
-						hashedParts := strings.Split(hashed, "$")
-						if len(hashedParts) != 4 {
-							return fmt.Errorf("Unexpected number of hashed parts: %d", len(hashedParts))
-						}
-
-						alg := hashedParts[0]
-						rawIter := hashedParts[1]
-						rawSalt := hashedParts[2]
-						rawHash := hashedParts[3]
-
-						if alg != "pbkdf2_sha256" {
-							return fmt.Errorf("Unexpected algorithm %q", hashedParts[0])
-						}
-
-						iter, err := strconv.Atoi(rawIter)
+						hashed, err := cryptoUtil.ParsePbkdf2Hash(rawHashed)
 						if err != nil {
 							return err
 						}
 
-						salt, err := base64.StdEncoding.DecodeString(rawSalt)
-						if err != nil {
-							return err
-						}
-
-						hash, err := base64.StdEncoding.DecodeString(rawHash)
-						if err != nil {
-							return err
-						}
-
-						data := pbkdf2.Key([]byte(pass), salt, iter, len(hash), sha256.New)
-
-						if subtle.ConstantTimeCompare(data, hash) == 1 {
+						if hashed.Verify([]byte(pass)) {
 							fmt.Printf("Password %q matched hash %s\n", pass, hashed)
 						} else {
 							fmt.Printf("Password %q did not match hash %s\n", pass, hashed)
