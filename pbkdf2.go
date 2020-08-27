@@ -25,8 +25,8 @@ var pbkdfHashers map[string]func() hash.Hash = map[string]func() hash.Hash{
 
 var DefaultPbdkf2Settings = Pbkdf2Settings{
 	Hasher:         "pbkdf2_sha256",
-	IterationCount: 260000,
-	SaltLen:        8,
+	IterationCount: 180000,
+	SaltLen:        12,
 	KeyLength:      32,
 }
 
